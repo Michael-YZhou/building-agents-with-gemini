@@ -8,6 +8,22 @@ export const tools: Tool[] = [
   {
     functionDeclarations: [
       {
+        name: "callSearchAgent",
+        description:
+          "Perform a web search to retrieve information that you don't know or that you think will take part in the future.",
+        parameters: {
+          type: SchemaType.OBJECT,
+          description: "Query the web with these properties.",
+          required: ["prompt"],
+          properties: {
+            prompt: {
+              type: SchemaType.STRING,
+              description: "The search query",
+            },
+          },
+        },
+      },
+      {
         name: "getDate",
         description: "Get the current date and use it to workout other days",
       },
@@ -55,7 +71,7 @@ export const tools: Tool[] = [
   },
 ];
 
-export const functions = { getDate, add, multiply };
+export const functions = { getDate, add, multiply, callSearchAgent };
 
 function getDate() {
   return { date: new Date().toDateString() };
@@ -67,4 +83,20 @@ function add({ a, b }: { a: number; b: number }) {
 
 function multiply({ a, b }: { a: number; b: number }) {
   return { multiplicationResult: a * b };
+}
+
+async function callSearchAgent({ prompt }: { prompt: string }) {
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.0-flash",
+    // @ts-expect-error The latest google search tool isn't typed properly yet.
+    tools: [{ googleSearch: {} }],
+    toolConfig: {
+      functionCallingConfig: {
+        mode: FunctionCallingMode.ANY,
+      },
+    },
+  });
+
+  const result = await model.generateContent(prompt);
+  return { searchResults: result.response.text() };
 }

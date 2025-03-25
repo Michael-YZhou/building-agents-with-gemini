@@ -39,27 +39,30 @@ export async function main(args: string[]) {
       continue;
     }
     try {
-      // Let's implement the bot logic here
-      // output.write(`[Echo]: ${userInput}\n`);
       const result = await bot.sendMessage(userInput);
-      const response = result.response;
+      const response = await result.response;
       output.write(response.text());
 
-      const functionCalls = response.functionCalls();
-      if (functionCalls && functionCalls.length > 0) {
-        const call = functionCalls[0];
-        const { name, args } = call;
-        const response = await functions[name](args);
-        const newResult = await bot.sendMessage([
-          {
-            functionResponse: {
-              name,
-              response: response,
-            },
-          },
-        ]);
-        const newResponse = newResult.response;
+      let functionCalls = response.functionCalls();
+
+      while (functionCalls && functionCalls.length > 0) {
+        const functionResponses = await Promise.all(
+          functionCalls.map(async (call) => {
+            const { name, args } = call;
+            // @ts-expect-error - typing name and args here is a pain
+            const response = await functions[name](args);
+            return {
+              functionResponse: {
+                name,
+                response,
+              },
+            };
+          })
+        );
+        const newResult = await bot.sendMessage(functionResponses);
+        const newResponse = await newResult.response;
         output.write(newResponse.text());
+        functionCalls = newResponse.functionCalls();
       }
 
       userInput = await readline.question("\n> ");
